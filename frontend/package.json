@@ -1,0 +1,12 @@
+{
+  "name": "tcp-chat-frontend",
+  "version": "1.0.0",
+  "description": "WebSocket → TCP proxy for the multi-client C chat server",
+  "main": "proxy.js",
+  "scripts": {
+    "start": "node proxy.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}
