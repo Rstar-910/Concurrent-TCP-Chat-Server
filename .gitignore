@@ -1,0 +1,19 @@
+# ── C build outputs ──────────────────────────────────────────
+server
+client
+*.o
+*.out
+*.exe
+*.bin
+
+# ── Node.js ──────────────────────────────────────────────────
+frontend/node_modules/
+frontend/package-lock.json
+
+# ── OS & editor ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+*.swp
+*.swo
