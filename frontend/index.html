@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TCP Chat</title>
+  <style>
+    /* ── Reset & base ───────────────────────────────────────── */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #242736;
+      --border: #2e3148;
+      --accent: #6c63ff;
+      --accent2: #a78bfa;
+      --text: #e2e8f0;
+      --text-dim: #8892a4;
+      --green: #34d399;
+      --red: #f87171;
+      --yellow: #fbbf24;
+      --radius: 12px;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--accent2);
+    }
+
+    .logo svg {
+      flex-shrink: 0;
+    }
+
+    .conn-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--red);
+      transition: background .3s;
+    }
+
+    #status-dot.connected {
+      background: var(--green);
+    }
+
+    #status-dot.connecting {
+      background: var(--yellow);
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: .3;
+      }
+    }
+
+    #status-text {
+      font-size: .85rem;
+      color: var(--text-dim);
+    }
+
+    #btn-connect {
+      padding: 7px 16px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      font-size: .85rem;
+      font-weight: 600;
+      background: var(--accent);
+      color: #fff;
+      transition: opacity .2s, transform .1s;
+    }
+
+    #btn-connect:hover {
+      opacity: .85;
+    }
+
+    #btn-connect:active {
+      transform: scale(.96);
+    }
+
+    #btn-connect.danger {
+      background: var(--red);
+    }
+
+    /* ── Layout: sidebar + chat ──────────────────────────────── */
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ─────────────────────────────────────────────── */
+    aside {
+      width: 220px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    .sidebar-title {
+      padding: 14px 16px 10px;
+      font-size: .75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text-dim);
+      border-bottom: 1px solid var(--border);
+    }
+
+    #client-id-box {
+      margin: 12px 14px;
+      padding: 10px 14px;
+      background: var(--surface2);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    #client-id-box .label {
+      font-size: .7rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    #my-id-display {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent2);
+      margin-top: 2px;
+    }
+
+    .section-label {
+      padding: 10px 16px 6px;
+      font-size: .7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text-dim);
+    }
+
+    /* Target-send form in sidebar */
+    .target-form {
+      padding: 0 12px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .target-form input,
+    .target-form textarea {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: .82rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    .target-form input:focus,
+    .target-form textarea:focus {
+      border-color: var(--accent);
+    }
+
+    .target-form textarea {
+      resize: none;
+      height: 60px;
+    }
+
+    .target-form button {
+      padding: 8px;
+      border-radius: 8px;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      font-size: .82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .2s;
+    }
+
+    .target-form button:hover {
+      opacity: .85;
+    }
+
+    /* ── Chat column ─────────────────────────────────────────── */
+    .chat-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Message list ────────────────────────────────────────── */
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scroll-behavior: smooth;
+    }
+
+    #messages::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    #messages::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    #messages::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+
+    .msg-row {
+      display: flex;
+      flex-direction: column;
+      max-width: 70%;
+    }
+
+    .msg-row.mine {
+      align-self: flex-end;
+      align-items: flex-end;
+    }
+
+    .msg-row.theirs {
+      align-self: flex-start;
+      align-items: flex-start;
+    }
+
+    .msg-row.system {
+      align-self: center;
+      align-items: center;
+      max-width: 90%;
+    }
+
+    .msg-bubble {
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: .9rem;
+      line-height: 1.5;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .mine .msg-bubble {
+      background: var(--accent);
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .theirs .msg-bubble {
+      background: var(--surface2);
+      color: var(--text);
+      border-bottom-left-radius: 4px;
+    }
+
+    .system .msg-bubble {
+      background: transparent;
+      color: var(--text-dim);
+      font-size: .78rem;
+      font-style: italic;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 14px;
+    }
+
+    .msg-row.dm {
+      align-self: flex-start;
+      align-items: flex-start;
+    }
+
+    .dm .msg-bubble {
+      background: #1e2d4a;
+      color: var(--text);
+      border: 1px solid var(--accent2);
+      border-bottom-left-radius: 4px;
+    }
+
+    .dm .msg-bubble::before {
+      content: '🔒 ';
+      font-size: .8em;
+    }
+
+    .msg-row.broadcast {
+      align-self: center;
+      align-items: center;
+      max-width: 90%;
+    }
+
+    .broadcast .msg-bubble {
+      background: #2d2100;
+      color: #fde68a;
+      border: 1px solid var(--yellow);
+      border-radius: 14px;
+      font-weight: 500;
+    }
+
+    .broadcast .msg-bubble::before {
+      content: '📢 ';
+      font-size: .85em;
+    }
+
+    .msg-time {
+      font-size: .7rem;
+      color: var(--text-dim);
+      margin-top: 3px;
+      padding: 0 4px;
+    }
+
+    /* ── Input bar ───────────────────────────────────────────── */
+    .input-bar {
+      padding: 14px 20px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    #msg-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 12px 16px;
+      font-size: .9rem;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      max-height: 120px;
+      min-height: 48px;
+      transition: border-color .2s;
+      line-height: 1.4;
+    }
+
+    #msg-input:focus {
+      border-color: var(--accent);
+    }
+
+    #msg-input::placeholder {
+      color: var(--text-dim);
+    }
+
+    #btn-send {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius);
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: opacity .2s, transform .1s;
+    }
+
+    #btn-send:hover {
+      opacity: .85;
+    }
+
+    #btn-send:active {
+      transform: scale(.94);
+    }
+
+    #btn-send:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+    }
+
+    /* ── Empty state ─────────────────────────────────────────── */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--text-dim);
+    }
+
+    .empty-state svg {
+      opacity: .3;
+    }
+
+    .empty-state p {
+      font-size: .9rem;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ── Header ───────────────────────────────────────────────── -->
+  <header>
+    <div class="logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
+      TCP Chat
+    </div>
+    <div class="conn-info">
+      <div id="status-dot"></div>
+      <span id="status-text">Disconnected</span>
+      <button id="btn-connect">Connect</button>
+    </div>
+  </header>
+
+  <!-- ── Body ─────────────────────────────────────────────────── -->
+  <div class="layout">
+
+    <!-- Sidebar -->
+    <aside>
+      <div class="sidebar-title">Session</div>
+
+      <div id="client-id-box">
+        <div class="label">Your client ID</div>
+        <div id="my-id-display">—</div>
+      </div>
+
+      <div class="section-label">Direct Message</div>
+      <div class="target-form">
+        <input id="target-id" type="number" min="1" placeholder="Target ID" />
+        <textarea id="target-msg" placeholder="Message…"></textarea>
+        <button id="btn-dm">Send DM</button>
+      </div>
+
+      <div class="section-label">Message to Server</div>
+      <div class="target-form">
+        <textarea id="bcast-msg" placeholder="Send a message to the server console…"></textarea>
+        <button id="btn-bcast" style="background:#1d4ed8;">✉️ Send to Server</button>
+      </div>
+    </aside>
+
+    <!-- Chat column -->
+    <div class="chat-col">
+      <div id="messages">
+        <div class="empty-state" id="empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          <p>Press <strong>Connect</strong> to join the chatroom</p>
+        </div>
+      </div>
+
+      <div class="input-bar">
+        <textarea id="msg-input" rows="1" placeholder="Broadcast to all… (Enter to send)"></textarea>
+        <button id="btn-send" disabled title="Send">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    'use strict';
+
+    /* ── DOM refs ──────────────────────────────────────────────── */
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+    const btnConnect = document.getElementById('btn-connect');
+    const myIdDisplay = document.getElementById('my-id-display');
+    const messagesEl = document.getElementById('messages');
+    const emptyState = document.getElementById('empty-state');
+    const msgInput = document.getElementById('msg-input');
+    const btnSend = document.getElementById('btn-send');
+    const targetId = document.getElementById('target-id');
+    const targetMsg = document.getElementById('target-msg');
+    const btnDm = document.getElementById('btn-dm');
+    const bcastMsg = document.getElementById('bcast-msg');
+    const btnBcast = document.getElementById('btn-bcast');
+
+    /* ── State ─────────────────────────────────────────────────── */
+    let ws = null;
+    let myId = null;   // assigned by server once connected
+
+    /* ── Helpers ───────────────────────────────────────────────── */
+    function setStatus(state, label) {
+      statusDot.className = state;   // '', 'connecting', 'connected'
+      statusText.textContent = label;
+    }
+
+    function now() {
+      return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    /**
+     * @param {string} text
+     * @param {'mine'|'theirs'|'system'} kind
+     */
+    function addMessage(text, kind) {
+      if (emptyState && emptyState.parentNode) {
+        emptyState.remove();
+      }
+
+      const row = document.createElement('div');
+      row.className = `msg-row ${kind}`;
+
+      const bubble = document.createElement('div');
+      bubble.className = 'msg-bubble';
+      bubble.textContent = text.trim();
+
+      const time = document.createElement('div');
+      time.className = 'msg-time';
+      time.textContent = now();
+
+      row.appendChild(bubble);
+      if (kind !== 'system') row.appendChild(time);
+      messagesEl.appendChild(row);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    /**
+     * Try to extract a client ID sent by the server on first connect.
+     * C server prints: "Client N connected ..." but the *client* only sees
+     * messages addressed to it.  We watch for patterns like "Client 3" or
+     * "[3]:" or just the first bracketed number.
+     */
+    /**
+     * If text is the welcome line "YOURID:N", extract the ID and return true.
+     * Returning true means the caller should NOT display this text as a message.
+     */
+    function tryParseId(text) {
+      const m = text.match(/^YOURID:(\d+)/);
+      if (m) {
+        myId = parseInt(m[1], 10);
+        myIdDisplay.textContent = myId;
+        return true;
+      }
+      return false;
+    }
+
+    /* ── WebSocket ─────────────────────────────────────────────── */
+    function connect() {
+      if (ws) return;
+
+      setStatus('connecting', 'Connecting…');
+      btnConnect.textContent = 'Connecting…';
+      btnConnect.disabled = true;
+
+      ws = new WebSocket('ws://localhost:8080');
+
+      ws.onopen = () => {
+        setStatus('connected', 'Connected');
+        btnConnect.textContent = 'Disconnect';
+        btnConnect.className = 'danger';
+        btnConnect.disabled = false;
+        btnSend.disabled = false;
+        addMessage('Connected to server', 'system');
+      };
+
+      ws.onmessage = ({ data }) => {
+        try {
+          const pkt = JSON.parse(data);
+          if (pkt.type === 'status') {
+            addMessage(pkt.text, 'system');
+          } else if (pkt.type === 'error') {
+            addMessage('Error: ' + pkt.text, 'system');
+          } else if (pkt.type === 'message') {
+            if (tryParseId(pkt.text)) {
+              /* YOURID handshake — show a quiet system note instead */
+              addMessage(`You joined as Client ${myId}`, 'system');
+            } else if (/^DM from \[\d+\]:/.test(pkt.text)) {
+              addMessage(pkt.text.trim(), 'dm');
+            } else if (/^BROADCAST/.test(pkt.text)) {
+              addMessage(pkt.text.trim(), 'broadcast');
+            } else {
+              addMessage(pkt.text, 'theirs');
+            }
+          }
+        } catch {
+          // plain text fallback
+          addMessage(data, 'theirs');
+        }
+      };
+
+      ws.onclose = () => {
+        setStatus('', 'Disconnected');
+        btnConnect.textContent = 'Connect';
+        btnConnect.className = '';
+        btnConnect.disabled = false;
+        btnSend.disabled = true;
+        myId = null;
+        myIdDisplay.textContent = '—';
+        addMessage('Disconnected from server', 'system');
+        ws = null;
+      };
+
+      ws.onerror = () => {
+        addMessage('WebSocket error — is proxy.js running?', 'system');
+      };
+    }
+
+    function disconnect() {
+      if (ws) ws.close();
+    }
+
+    function sendText(text) {
+      if (!ws || ws.readyState !== WebSocket.OPEN || !text.trim()) return;
+      ws.send(JSON.stringify({ text: text.trim() }));
+      addMessage(text.trim(), 'mine');
+    }
+
+    /* Broadcast text to every other client via *:message */
+    function sendBroadcast(text) {
+      if (!ws || ws.readyState !== WebSocket.OPEN || !text.trim()) return;
+      const t = text.trim();
+      ws.send(JSON.stringify({ text: `*:${t}` }));
+      addMessage(`📢 Broadcast (you → all): ${t}`, 'broadcast');
+    }
+
+    /* ── Event listeners ───────────────────────────────────────── */
+    btnConnect.addEventListener('click', () => {
+      ws ? disconnect() : connect();
+    });
+
+    btnSend.addEventListener('click', () => {
+      sendBroadcast(msgInput.value);
+      msgInput.value = '';
+      msgInput.style.height = '';
+    });
+
+    msgInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendBroadcast(msgInput.value);
+        msgInput.value = '';
+        msgInput.style.height = '';
+      }
+    });
+
+    // Auto-grow textarea
+    msgInput.addEventListener('input', () => {
+      msgInput.style.height = 'auto';
+      msgInput.style.height = Math.min(msgInput.scrollHeight, 120) + 'px';
+    });
+
+    btnDm.addEventListener('click', () => {
+      const id = parseInt(targetId.value, 10);
+      const msg = targetMsg.value.trim();
+      if (!id || !msg) { alert('Enter a target ID and message.'); return; }
+      if (id === myId) { alert('Cannot DM yourself.'); return; }
+      /* Server parses "targetID:message" from any client socket */
+      sendText(`${id}:${msg}`);
+      addMessage(`DM to [${id}]: ${msg}`, 'system');
+      targetMsg.value = '';
+      /* pre-fill ID stays for quick follow-up messages */
+    });
+
+    btnBcast.addEventListener('click', () => {
+      const msg = bcastMsg.value.trim();
+      if (!msg) { alert('Enter a message.'); return; }
+      /* Raw text — server prints it to its console, does not relay to other clients */
+      sendText(msg);
+      addMessage(`✉️ To Server: ${msg}`, 'system');
+      bcastMsg.value = '';
+    });
+  </script>
+</body>
+
+</html>
